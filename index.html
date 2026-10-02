@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phonetisch Alfabet Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Fredoka', sans-serif;
+            /* A playful, vibrant background gradient */
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            background-attachment: fixed;
+            color: #334155;
+        }
+        
+        /* Bubbly card style */
+        .bubbly-card {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), inset 0 0 0 4px white;
+            border: 2px solid #e2e8f0;
+        }
+
+        /* Animations */
+        .pop-in {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+        }
+
+        .bounce {
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-15px); }
+            60% { transform: translateY(-7px); }
+        }
+
+        /* Coin animation */
+        .coin-float {
+            position: absolute;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #eab308;
+            text-shadow: 1px 1px 0 #ca8a04;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+
+        /* Custom Scrollbar for the shop */
+        .shop-scroll::-webkit-scrollbar { width: 8px; }
+        .shop-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .shop-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .shop-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex items-center justify-center">
+
+    <div class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- LEFT COLUMN: Avatar & Shop (Spans 4 columns) -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- Avatar Section -->
+            <div class="bubbly-card p-6 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-400 to-purple-400 opacity-20 rounded-t-3xl"></div>
+                
+                <h2 class="text-2xl font-bold text-indigo-600 mb-4 relative z-10">Jouw Karakter</h2>
+                
+                <!-- The Avatar -->
+                <div class="relative w-40 h-40 mx-auto bg-yellow-300 rounded-full border-4 border-yellow-400 shadow-lg flex items-center justify-center text-6xl mb-4 bounce">
+                    <!-- Base face -->
+                    <span id="avatar-base">😊</span>
+                    
+                    <!-- Equip slots (positioned absolutely over the face) -->
+                    <div id="slot-head" class="absolute -top-8 text-7xl z-20 transition-transform duration-300"></div>
+                    <div id="slot-face" class="absolute top-8 text-7xl z-20 transition-transform duration-300"></div>
+                    <div id="slot-acc" class="absolute -right-6 top-16 text-6xl z-10 transition-transform duration-300"></div>
+                </div>
+
+                <!-- Wallet -->
+                <div class="inline-flex items-center bg-yellow-100 border-2 border-yellow-400 text-yellow-700 px-4 py-2 rounded-full font-bold text-xl shadow-sm relative z-10">
+                    🪙 <span id="coin-display" class="ml-2">0</span>
+                </div>
+            </div>
+
+            <!-- Shop Section -->
+            <div class="bubbly-card p-6 flex-1 flex flex-col h-80 lg:h-auto">
+                <h2 class="text-2xl font-bold text-pink-500 mb-2">De Winkel 🛍️</h2>
+                <p class="text-sm text-slate-500 mb-4">Koop spullen om je karakter te versieren!</p>
+                
+                <!-- Shop Items Grid -->
+                <div id="shop-grid" class="grid grid-cols-2 gap-3 overflow-y-auto shop-scroll pr-2 pb-2">
+                    <!-- Items injected by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: The Game (Spans 8 columns) -->
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- Game Card -->
+            <div class="bubbly-card p-6 md:p-10 flex-1 flex flex-col justify-center relative">
+                
+                <!-- Score & Streak Header -->
+                <div class="flex justify-between items-center mb-8 bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 shadow-inner">
+                    <div class="text-lg font-bold text-slate-600">
+                        Score: <span id="score-display" class="text-indigo-600 text-2xl">0</span>
+                    </div>
+                    <div class="text-lg font-bold text-slate-600">
+                        🔥 Streak: <span id="streak-display" class="text-orange-500 text-2xl">0</span>
+                    </div>
+                </div>
+
+                <!-- Game Canvas -->
+                <div class="text-center relative">
+                    <p id="instruction-text" class="text-xl text-slate-500 mb-6 font-semibold uppercase tracking-wide">
+                        Welk NAVO-woord hoort hierbij?
+                    </p>
+                    
+                    <!-- The dynamic letter or image -->
+                    <div id="question-display" class="text-9xl md:text-[10rem] font-black text-indigo-500 mb-2 drop-shadow-md min-h-[160px] flex items-center justify-center">
+                        ?
+                    </div>
+                    
+                    <!-- Nieuwe Hint Sectie -->
+                    <div class="h-10 mb-6 flex flex-col items-center justify-center">
+                        <button type="button" id="hint-btn" class="text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-4 rounded-full font-semibold transition-colors hidden shadow-sm">
+                            💡 Toon Hint
+                        </button>
+                        <p id="hint-text" class="text-md text-pink-500 font-bold hidden pop-in">
+                            <!-- Hint verschijnt hier na het klikken -->
+                        </p>
+                    </div>
+
+                    <form id="game-form" class="max-w-md mx-auto space-y-4 relative">
+                        <input 
+                            type="text" 
+                            id="user-input" 
+                            class="w-full bg-white border-4 border-indigo-100 rounded-2xl p-4 text-3xl text-center font-bold text-indigo-900 focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all shadow-inner"
+                            placeholder="Typ het woord..."
+                            autocomplete="off"
+                        >
+                        <button 
+                            type="submit" 
+                            class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-[0_6px_0_0_#4338ca] active:shadow-[0_0px_0_0_#4338ca] active:translate-y-[6px] text-xl"
+                        >
+                            Controleer! ✨
+                        </button>
+                    </form>
+
+                    <!-- Feedback popup inside the game area -->
+                    <div id="feedback-msg" class="absolute left-0 right-0 -bottom-16 opacity-0 transition-all duration-300 transform translate-y-4 font-bold text-2xl text-center p-3 rounded-xl">
+                        Correct! +20 🪙
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spiekbriefje Toggle -->
+            <div class="text-center">
+                <button id="toggle-cheat" class="bg-white/50 hover:bg-white border-2 border-white text-indigo-600 font-bold py-2 px-6 rounded-full transition-colors shadow-sm">
+                    👀 Bekijk het Spiekbriefje
+                </button>
+            </div>
+
+            <!-- Cheat Sheet (Hidden by default) -->
+            <div id="cheat-sheet" class="bubbly-card p-6 hidden pop-in">
+                <h3 class="text-xl font-bold mb-4 text-center text-purple-600">Het NAVO Spellingsalfabet</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="cheat-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced Dictionary with Emojis and Hints
+        const alphabetData = {
+            'A': { words: ['Alpha', 'Alfa'], emoji: '🍎', hint: 'Appel = A' },
+            'B': { words: ['Bravo'], emoji: '🍌', hint: 'Banaan = B' },
+            'C': { words: ['Charlie'], emoji: '🌵', hint: 'Cactus = C' },
+            'D': { words: ['Delta'], emoji: '🍩', hint: 'Donut = D' },
+            'E': { words: ['Echo'], emoji: '🥚', hint: 'Ei = E' },
+            'F': { words: ['Foxtrot'], emoji: '🚲', hint: 'Fiets = F' },
+            'G': { words: ['Golf'], emoji: '🎸', hint: 'Gitaar = G' },
+            'H': { words: ['Hotel'], emoji: '🏠', hint: 'Huis = H' },
+            'I': { words: ['India'], emoji: '🧊', hint: 'IJsblokje = I' },
+            'J': { words: ['Juliett', 'Juliet'], emoji: '🧥', hint: 'Jas = J' },
+            'K': { words: ['Kilo'], emoji: '🧀', hint: 'Kaas = K' },
+            'L': { words: ['Lima'], emoji: '🦁', hint: 'Leeuw = L' },
+            'M': { words: ['Mike'], emoji: '🌙', hint: 'Maan = M' },
+            'N': { words: ['November'], emoji: '🦏', hint: 'Neushoorn = N' },
+            'O': { words: ['Oscar'], emoji: '🐘', hint: 'Olifant = O' },
+            'P': { words: ['Papa'], emoji: '🍕', hint: 'Pizza = P' },
+            'Q': { words: ['Quebec'], emoji: '🏍️', hint: 'Quad = Q' },
+            'R': { words: ['Romeo'], emoji: '🚀', hint: 'Raket = R' },
+            'S': { words: ['Sierra'], emoji: '🐍', hint: 'Slang = S' },
+            'T': { words: ['Tango'], emoji: '🍅', hint: 'Tomaat = T' },
+            'U': { words: ['Uniform'], emoji: '🦉', hint: 'Uil = U' },
+            'V': { words: ['Victor'], emoji: '🐟', hint: 'Vis = V' },
+            'W': { words: ['Whiskey'], emoji: '🥕', hint: 'Wortel = W' },
+            'X': { words: ['X-ray', 'Xray'], emoji: '🩻', hint: 'X-ray (Röntgen) = X' },
+            'Y': { words: ['Yankee'], emoji: '🧘', hint: 'Yoga = Y' },
+            'Z': { words: ['Zulu'], emoji: '☀️', hint: 'Zon = Z' }
+        };
+
+        const letters = Object.keys(alphabetData);
+
+        // Shop Items Data
+        const shopItems = [
+            { id: 'cap', name: 'Petje', price: 30, type: 'head', emoji: '🧢' },
+            { id: 'beanie', name: 'Muts', price: 50, type: 'head', emoji: '👲' },
+            { id: 'tophat', name: 'Hoge Hoed', price: 100, type: 'head', emoji: '🎩' },
+            { id: 'crown', name: 'Kroon', price: 250, type: 'head', emoji: '👑' },
+            { id: 'sunglasses', name: 'Zonnebril', price: 40, type: 'face', emoji: '🕶️' },
+            { id: 'nerd', name: 'Bril', price: 40, type: 'face', emoji: '🤓' },
+            { id: 'disguise', name: 'Snor', price: 80, type: 'face', emoji: '🥸' },
+            { id: 'clown', name: 'Clown', price: 120, type: 'face', emoji: '🤡' },
+            { id: 'balloon', name: 'Ballon', price: 50, type: 'acc', emoji: '🎈' },
+            { id: 'medal', name: 'Medaille', price: 150, type: 'acc', emoji: '🏅' },
+            { id: 'parrot', name: 'Papegaai', price: 300, type: 'acc', emoji: '🦜' },
+            { id: 'sparkles', name: 'Magie', price: 200, type: 'acc', emoji: '✨' }
+        ];
+
+        // State Variables
+        let gameState = {
+            coins: 0,
+            score: 0,
+            inventory: [], // Array of item IDs
+            equipped: { head: null, face: null, acc: null }
+        };
+        let currentLetter = '';
+        let currentMode = 'letter'; // 'letter' or 'emoji'
+        let streak = 0;
+        let isProcessing = false;
+
+        // Load state from local storage if available
+        if (localStorage.getItem('phoneticGameState')) {
+            try {
+                gameState = JSON.parse(localStorage.getItem('phoneticGameState'));
+                // Ensure default structure if old save
+                if (!gameState.equipped) gameState.equipped = { head: null, face: null, acc: null };
+                if (!gameState.inventory) gameState.inventory = [];
+                // Reset score for a new session, but keep coins and items!
+                gameState.score = 0; 
+            } catch (e) {
+                console.error("Could not load save data");
+            }
+        }
+
+        // Save state function
+        function saveState() {
+            localStorage.setItem('phoneticGameState', JSON.stringify({
+                coins: gameState.coins,
+                inventory: gameState.inventory,
+                equipped: gameState.equipped
+            }));
+        }
+
+        // DOM Elements
+        const displayQuestion = document.getElementById('question-display');
+        const hintText = document.getElementById('hint-text');
+        const hintBtn = document.getElementById('hint-btn');
+        const userInput = document.getElementById('user-input');
+        const form = document.getElementById('game-form');
+        const scoreDisplay = document.getElementById('score-display');
+        const streakDisplay = document.getElementById('streak-display');
+        const coinDisplay = document.getElementById('coin-display');
+        const feedbackMsg = document.getElementById('feedback-msg');
+        const shopGrid = document.getElementById('shop-grid');
+        
+        // Render Avatar
+        function renderAvatar() {
+            // Get emojis for equipped items
+            const getEmoji = (id) => id ? shopItems.find(i => i.id === id).emoji : '';
+            
+            document.getElementById('slot-head').textContent = getEmoji(gameState.equipped.head);
+            // Face emoji needs slightly different positioning depending on what it is
+            const faceEmoji = getEmoji(gameState.equipped.face);
+            const faceSlot = document.getElementById('slot-face');
+            faceSlot.textContent = faceEmoji;
+            
+            // Adjust disguise/clown size to cover the base face better
+            if (gameState.equipped.face === 'disguise' || gameState.equipped.face === 'clown') {
+                faceSlot.classList.add('scale-150');
+                document.getElementById('avatar-base').style.opacity = '0.5'; // dim the base face
+            } else {
+                faceSlot.classList.remove('scale-150');
+                document.getElementById('avatar-base').style.opacity = '1';
+            }
+
+            document.getElementById('slot-acc').textContent = getEmoji(gameState.equipped.acc);
+        }
+
+        // Render Shop
+        function renderShop() {
+            shopGrid.innerHTML = '';
+            
+            shopItems.forEach(item => {
+                const isOwned = gameState.inventory.includes(item.id);
+                const isEquipped = gameState.equipped[item.type] === item.id;
+                
+                const btn = document.createElement('button');
+                btn.className = `p-3 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${
+                    isEquipped ? 'bg-green-100 border-green-400' :
+                    isOwned ? 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100' :
+                    gameState.coins >= item.price ? 'bg-white border-slate-200 hover:border-yellow-400 cursor-pointer shadow-sm' :
+                    'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
+                }`;
+                
+                let buttonText = isEquipped ? 'Aan' : isOwned ? 'Uitrusten' : `🪙 ${item.price}`;
+                let buttonClass = isEquipped ? 'text-green-600 font-bold' : isOwned ? 'text-indigo-600 font-bold' : 'text-slate-600 font-bold';
+
+                btn.innerHTML = `
+                    <span class="text-4xl mb-2">${item.emoji}</span>
+                    <span class="text-xs font-bold text-slate-700 mb-1">${item.name}</span>
+                    <span class="text-xs bg-white px-2 py-1 rounded-md border ${buttonClass}">${buttonText}</span>
+                `;
+
+                btn.onclick = () => handleShopClick(item);
+                shopGrid.appendChild(btn);
+            });
+            
+            coinDisplay.textContent = gameState.coins;
+        }
+
+        function handleShopClick(item) {
+            const isOwned = gameState.inventory.includes(item.id);
+            const isEquipped = gameState.equipped[item.type] === item.id;
+
+            if (isEquipped) {
+                // Unequip
+                gameState.equipped[item.type] = null;
+            } else if (isOwned) {
+                // Equip
+                gameState.equipped[item.type] = item.id;
+            } else if (gameState.coins >= item.price) {
+                // Buy
+                gameState.coins -= item.price;
+                gameState.inventory.push(item.id);
+                // Auto equip on buy
+                gameState.equipped[item.type] = item.id;
+                showCoinAnimation(shopGrid, `-${item.price}`, '#ef4444'); // red text for spend
+            } else {
+                // Not enough coins
+                const feedback = document.createElement('div');
+                feedback.className = 'absolute top-0 left-0 w-full h-full bg-red-100/90 text-red-600 font-bold flex items-center justify-center rounded-xl z-10 pop-in';
+                feedback.textContent = 'Te weinig munten!';
+                shopGrid.appendChild(feedback);
+                setTimeout(() => feedback.remove(), 1500);
+                return;
+            }
+
+            saveState();
+            renderShop();
+            renderAvatar();
+        }
+
+        function populateCheatSheet() {
+            const grid = document.getElementById('cheat-grid');
+            letters.forEach(letter => {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-2 rounded-lg border-2 border-indigo-50 flex items-center shadow-sm';
+                div.innerHTML = `
+                    <span class="font-black text-indigo-500 text-xl w-8">${letter}</span> 
+                    <span class="font-semibold text-slate-700 flex-1">${alphabetData[letter].words[0]}</span>
+                    <span class="text-xl">${alphabetData[letter].emoji}</span>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function nextQuestion() {
+            // Pick random letter
+            let newLetter;
+            do {
+                newLetter = letters[Math.floor(Math.random() * letters.length)];
+            } while (newLetter === currentLetter);
+            
+            currentLetter = newLetter;
+            
+            // 50% chance to show Emoji instead of Letter
+            currentMode = Math.random() < 0.5 ? 'emoji' : 'letter';
+            
+            // Verberg hint tekst en hint knop standaard bij nieuwe vraag
+            hintText.classList.add('hidden');
+            hintBtn.classList.add('hidden');
+            
+            if (currentMode === 'emoji') {
+                displayQuestion.textContent = alphabetData[currentLetter].emoji;
+                displayQuestion.className = "text-[8rem] md:text-[10rem] mb-2 drop-shadow-md min-h-[160px] flex items-center justify-center pop-in";
+                document.getElementById('instruction-text').textContent = "Welk NAVO-woord hoort bij deze letter?";
+                hintText.textContent = alphabetData[currentLetter].hint;
+                hintBtn.classList.remove('hidden'); // Toon de hint knop
+            } else {
+                displayQuestion.textContent = currentLetter;
+                displayQuestion.className = "text-9xl md:text-[10rem] font-black text-indigo-500 mb-2 drop-shadow-md min-h-[160px] flex items-center justify-center pop-in";
+                document.getElementById('instruction-text').textContent = "Welk NAVO-woord hoort hierbij?";
+                hintText.textContent = ""; // Clear hint
+            }
+
+            userInput.value = '';
+            
+            // Trigger reflow for animation
+            displayQuestion.classList.remove('pop-in');
+            void displayQuestion.offsetWidth;
+            displayQuestion.classList.add('pop-in');
+            
+            userInput.focus();
+            isProcessing = false;
+        }
+
+        function showCoinAnimation(container, text, color = '#eab308') {
+            const anim = document.createElement('div');
+            anim.className = 'coin-float';
+            anim.textContent = text;
+            anim.style.color = color;
+            anim.style.left = '50%';
+            anim.style.top = '20%';
+            container.appendChild(anim);
+            setTimeout(() => anim.remove(), 1000);
+        }
+
+        function handleFeedback(isCorrect, correctAnswer = '') {
+            feedbackMsg.style.opacity = '1';
+            feedbackMsg.style.transform = 'translateY(0)';
+            
+            if (isCorrect) {
+                // Calculate coins
+                let baseCoins = 10;
+                let streakBonus = streak * 2;
+                let modeBonus = currentMode === 'emoji' ? 10 : 0; // Extra coins for guessing image
+                let totalCoinsEarned = baseCoins + streakBonus + modeBonus;
+
+                gameState.coins += totalCoinsEarned;
+                gameState.score += 100 + (streak * 10);
+                
+                feedbackMsg.innerHTML = `Geweldig! +${totalCoinsEarned} 🪙`;
+                feedbackMsg.className = 'absolute left-0 right-0 -bottom-16 transition-all duration-300 font-bold text-2xl text-center p-3 rounded-xl bg-green-100 text-green-600 border-2 border-green-400 shadow-lg z-20';
+                
+                showCoinAnimation(displayQuestion.parentElement, `+${totalCoinsEarned} 🪙`);
+
+            } else {
+                feedbackMsg.innerHTML = `Oeps! Het was: <span class="font-black text-red-700">${correctAnswer}</span>`;
+                feedbackMsg.className = 'absolute left-0 right-0 -bottom-16 transition-all duration-300 font-bold text-xl text-center p-3 rounded-xl bg-red-100 text-red-600 border-2 border-red-400 shadow-lg z-20';
+                
+                userInput.classList.add('shake');
+                setTimeout(() => userInput.classList.remove('shake'), 400);
+            }
+
+            // Update UI
+            scoreDisplay.textContent = gameState.score;
+            streakDisplay.textContent = streak;
+            renderShop(); // Updates coin display and shop buttons
+            saveState();
+
+            // Hide feedback and go to next
+            setTimeout(() => {
+                feedbackMsg.style.opacity = '0';
+                feedbackMsg.style.transform = 'translateY(1rem)';
+                if(!isCorrect) {
+                    setTimeout(nextQuestion, 300); // Small delay before next after a mistake to let it sink in
+                } else {
+                    nextQuestion();
+                }
+            }, isCorrect ? 1000 : 2500); // Give more time to read if wrong
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (isProcessing) return;
+            
+            const answer = userInput.value.trim().toLowerCase();
+            if (!answer) return;
+
+            isProcessing = true;
+            
+            const validAnswers = alphabetData[currentLetter].words.map(w => w.toLowerCase());
+            const isCorrect = validAnswers.includes(answer);
+
+            if (isCorrect) {
+                streak++;
+                handleFeedback(true);
+            } else {
+                streak = 0;
+                handleFeedback(false, alphabetData[currentLetter].words[0]);
+            }
+        });
+
+        document.getElementById('toggle-cheat').addEventListener('click', () => {
+            const sheet = document.getElementById('cheat-sheet');
+            sheet.classList.toggle('hidden');
+            if(!sheet.classList.contains('hidden')) {
+                sheet.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+            userInput.focus();
+        });
+
+        // Event listener voor de nieuwe hint knop
+        hintBtn.addEventListener('click', () => {
+            hintText.classList.remove('hidden'); // Toon de tekst
+            hintBtn.classList.add('hidden');     // Verberg de knop
+            userInput.focus();                   // Houd de focus op het typveld
+        });
+
+        // Initialize Game
+        function init() {
+            populateCheatSheet();
+            renderShop();
+            renderAvatar();
+            scoreDisplay.textContent = gameState.score;
+            streakDisplay.textContent = streak;
+            nextQuestion();
+            
+            // Focus input whenever window is clicked (helps with continuous play)
+            document.addEventListener('click', (e) => {
+                if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                    userInput.focus();
+                }
+            });
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
