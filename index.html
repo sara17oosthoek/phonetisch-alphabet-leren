@@ -78,16 +78,47 @@
 </head>
 <body class="min-h-screen p-4 md:p-8 flex items-center justify-center">
 
-    <div class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Login / Register Screen -->
+    <div id="auth-screen" class="max-w-md w-full bubbly-card p-8 transition-all shadow-2xl">
+        <h1 class="text-4xl font-black text-indigo-600 mb-2 text-center">Welkom! 👋</h1>
+        <p class="text-center text-slate-500 mb-6 font-semibold">Vul je naam en wachtwoord in. Bestaat je naam nog niet? Dan maken we direct een account voor je aan!</p>
+        
+        <div id="auth-error" class="hidden bg-red-100 text-red-600 p-3 rounded-lg mb-4 font-bold text-center border-2 border-red-200"></div>
+
+        <form id="auth-form" class="space-y-4">
+            <div>
+                <label class="block text-slate-700 font-bold mb-2">Gebruikersnaam</label>
+                <input type="text" id="auth-username" class="w-full bg-slate-50 border-2 border-indigo-100 rounded-xl p-3 font-bold text-indigo-900 focus:outline-none focus:border-indigo-400" placeholder="Typ je naam..." required>
+            </div>
+            <div>
+                <label class="block text-slate-700 font-bold mb-2">Wachtwoord</label>
+                <input type="password" id="auth-password" class="w-full bg-slate-50 border-2 border-indigo-100 rounded-xl p-3 font-bold text-indigo-900 focus:outline-none focus:border-indigo-400" placeholder="Kies een wachtwoord..." required>
+            </div>
+            
+            <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-[0_4px_0_0_#4338ca] active:shadow-[0_0px_0_0_#4338ca] active:translate-y-[4px] text-lg mt-4">
+                Spelen! 🚀
+            </button>
+        </form>
+    </div>
+
+    <!-- Main Game Container (Hidden by default) -->
+    <div id="game-screen" class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
         
         <!-- LEFT COLUMN: Avatar & Shop (Spans 4 columns) -->
         <div class="lg:col-span-4 flex flex-col gap-6">
             
             <!-- Avatar Section -->
             <div class="bubbly-card p-6 text-center relative overflow-hidden">
+                
+                <!-- Logout Button -->
+                <button id="logout-btn" class="absolute top-4 right-4 z-20 text-xs bg-white/80 hover:bg-white border-2 border-slate-200 text-slate-500 hover:text-red-500 hover:border-red-300 py-1 px-3 rounded-lg font-bold transition-all shadow-sm">
+                    Uitloggen
+                </button>
+
                 <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-400 to-purple-400 opacity-20 rounded-t-3xl"></div>
                 
-                <h2 class="text-2xl font-bold text-indigo-600 mb-4 relative z-10">Jouw Karakter</h2>
+                <h2 class="text-2xl font-bold text-indigo-600 mb-1 relative z-10">Jouw Karakter</h2>
+                <p id="player-name-display" class="text-sm font-bold text-pink-500 mb-4 relative z-10"></p>
                 
                 <!-- The Avatar -->
                 <div class="relative w-40 h-40 mx-auto bg-yellow-300 rounded-full border-4 border-yellow-400 shadow-lg flex items-center justify-center text-6xl mb-4 bounce">
@@ -169,6 +200,15 @@
                         >
                             Controleer! ✨
                         </button>
+                        
+                        <!-- Spiekbriefje Toggle verplaatst naar deze opvallende plek -->
+                        <button 
+                            type="button" 
+                            id="toggle-cheat" 
+                            class="w-full bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 text-amber-700 font-bold py-3 px-6 rounded-2xl transition-all shadow-sm hidden mt-4"
+                        >
+                            👀 Bekijk het Spiekbriefje
+                        </button>
                     </form>
 
                     <!-- Feedback popup inside the game area -->
@@ -176,13 +216,6 @@
                         Correct! +20 🪙
                     </div>
                 </div>
-            </div>
-
-            <!-- Spiekbriefje Toggle -->
-            <div class="text-center">
-                <button id="toggle-cheat" class="bg-white/50 hover:bg-white border-2 border-white text-indigo-600 font-bold py-2 px-6 rounded-full transition-colors shadow-sm">
-                    👀 Bekijk het Spiekbriefje
-                </button>
             </div>
 
             <!-- Cheat Sheet (Hidden by default) -->
@@ -193,6 +226,7 @@
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <script>
@@ -245,6 +279,9 @@
         ];
 
         // State Variables
+        let usersDB = JSON.parse(localStorage.getItem('phoneticUsersDB')) || {};
+        let currentUser = null;
+
         let gameState = {
             coins: 0,
             score: 0,
@@ -255,29 +292,104 @@
         let currentMode = 'letter'; // 'letter' or 'emoji'
         let streak = 0;
         let isProcessing = false;
+        let currentAttempts = 0;
 
-        // Load state from local storage if available
-        if (localStorage.getItem('phoneticGameState')) {
-            try {
-                gameState = JSON.parse(localStorage.getItem('phoneticGameState'));
-                // Ensure default structure if old save
-                if (!gameState.equipped) gameState.equipped = { head: null, face: null, acc: null };
-                if (!gameState.inventory) gameState.inventory = [];
-                // Reset score for a new session, but keep coins and items!
-                gameState.score = 0; 
-            } catch (e) {
-                console.error("Could not load save data");
-            }
-        }
+        // Auth DOM Elements
+        const authScreen = document.getElementById('auth-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const authForm = document.getElementById('auth-form');
+        const authUsernameInput = document.getElementById('auth-username');
+        const authPasswordInput = document.getElementById('auth-password');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const authError = document.getElementById('auth-error');
+        const logoutBtn = document.getElementById('logout-btn');
+        const playerNameDisplay = document.getElementById('player-name-display');
 
         // Save state function
         function saveState() {
-            localStorage.setItem('phoneticGameState', JSON.stringify({
+            if (!currentUser) return;
+            usersDB[currentUser].gameState = {
                 coins: gameState.coins,
                 inventory: gameState.inventory,
                 equipped: gameState.equipped
-            }));
+            };
+            localStorage.setItem('phoneticUsersDB', JSON.stringify(usersDB));
         }
+
+        // --- AUTHENTICATION LOGIC ---
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = authUsernameInput.value.trim();
+            const password = authPasswordInput.value.trim();
+
+            if (!username || !password) {
+                showAuthError("Vul alles in!");
+                return;
+            }
+
+            if (usersDB[username]) {
+                // Account bestaat al, check wachtwoord om in te loggen
+                if (usersDB[username].password === password) {
+                    loginUser(username);
+                } else {
+                    showAuthError("Verkeerd wachtwoord voor deze naam!");
+                }
+            } else {
+                // Account bestaat niet, we maken direct een nieuw account aan
+                usersDB[username] = {
+                    password: password,
+                    gameState: {
+                        coins: 0,
+                        inventory: [],
+                        equipped: { head: null, face: null, acc: null }
+                    }
+                };
+                localStorage.setItem('phoneticUsersDB', JSON.stringify(usersDB));
+                loginUser(username);
+            }
+        });
+
+        function showAuthError(msg) {
+            authError.textContent = msg;
+            authError.classList.remove('hidden');
+            authError.classList.remove('pop-in');
+            void authError.offsetWidth; // trigger reflow
+            authError.classList.add('pop-in');
+        }
+
+        function loginUser(username) {
+            currentUser = username;
+            
+            // Load user state
+            const loadedState = usersDB[username].gameState;
+            gameState = {
+                coins: loadedState.coins || 0,
+                score: 0, // Reset score per sessie
+                inventory: loadedState.inventory || [],
+                equipped: loadedState.equipped || { head: null, face: null, acc: null }
+            };
+            streak = 0;
+
+            // Update UI
+            playerNameDisplay.textContent = `Speler: ${username}`;
+            authScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            
+            // Initialize game for this user
+            initGameData();
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            saveState();
+            currentUser = null;
+            authUsernameInput.value = '';
+            authPasswordInput.value = '';
+            authError.classList.add('hidden');
+            
+            gameScreen.classList.add('hidden');
+            authScreen.classList.remove('hidden');
+        });
+        // --- EINDE AUTHENTICATION LOGIC ---
 
         // DOM Elements
         const displayQuestion = document.getElementById('question-display');
@@ -380,12 +492,21 @@
 
         function populateCheatSheet() {
             const grid = document.getElementById('cheat-grid');
+            grid.innerHTML = '';
             letters.forEach(letter => {
+                const fullWord = alphabetData[letter].words[0];
+                
+                // Maak een gedeeltelijk woord (bijv. Alpha wordt Al _ _ _)
+                let partialWord = fullWord.substring(0, 2);
+                for (let i = 2; i < fullWord.length; i++) {
+                    partialWord += ' _';
+                }
+
                 const div = document.createElement('div');
                 div.className = 'bg-white p-2 rounded-lg border-2 border-indigo-50 flex items-center shadow-sm';
                 div.innerHTML = `
                     <span class="font-black text-indigo-500 text-xl w-8">${letter}</span> 
-                    <span class="font-semibold text-slate-700 flex-1">${alphabetData[letter].words[0]}</span>
+                    <span class="font-semibold text-slate-700 flex-1">${partialWord}</span>
                     <span class="text-xl">${alphabetData[letter].emoji}</span>
                 `;
                 grid.appendChild(div);
@@ -400,6 +521,9 @@
             } while (newLetter === currentLetter);
             
             currentLetter = newLetter;
+            currentAttempts = 0;
+            document.getElementById('toggle-cheat').classList.add('hidden');
+            document.getElementById('cheat-sheet').classList.add('hidden');
             
             // 50% chance to show Emoji instead of Letter
             currentMode = Math.random() < 0.5 ? 'emoji' : 'letter';
@@ -494,18 +618,44 @@
             
             const answer = userInput.value.trim().toLowerCase();
             if (!answer) return;
-
-            isProcessing = true;
             
             const validAnswers = alphabetData[currentLetter].words.map(w => w.toLowerCase());
             const isCorrect = validAnswers.includes(answer);
 
             if (isCorrect) {
+                isProcessing = true;
                 streak++;
                 handleFeedback(true);
             } else {
+                currentAttempts++;
                 streak = 0;
-                handleFeedback(false, alphabetData[currentLetter].words[0]);
+                streakDisplay.textContent = streak;
+                
+                if (currentAttempts === 1) {
+                    // Eerste fout - geef nog een kans en toon de spiekbrief-knop
+                    isProcessing = true; // Blokkeer tijdelijk het typen
+                    userInput.classList.add('shake');
+                    setTimeout(() => userInput.classList.remove('shake'), 400);
+                    
+                    feedbackMsg.style.opacity = '1';
+                    feedbackMsg.style.transform = 'translateY(0)';
+                    feedbackMsg.innerHTML = `Oeps! Dat klopt niet. Je hebt nog 1 kans! (Spiekbrief beschikbaar)`;
+                    feedbackMsg.className = 'absolute left-0 right-0 -bottom-16 transition-all duration-300 font-bold text-lg md:text-xl text-center p-3 rounded-xl bg-orange-100 text-orange-600 border-2 border-orange-400 shadow-lg z-20';
+                    
+                    document.getElementById('toggle-cheat').classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        feedbackMsg.style.opacity = '0';
+                        feedbackMsg.style.transform = 'translateY(1rem)';
+                        userInput.value = '';
+                        userInput.focus();
+                        isProcessing = false; // Geef het invoerveld weer vrij
+                    }, 2500);
+                } else {
+                    // Tweede fout - toon het antwoord en ga door
+                    isProcessing = true;
+                    handleFeedback(false, alphabetData[currentLetter].words[0]);
+                }
             }
         });
 
@@ -525,25 +675,29 @@
             userInput.focus();                   // Houd de focus op het typveld
         });
 
-        // Initialize Game
-        function init() {
-            populateCheatSheet();
+        // Initialize Game Data (Called after login)
+        function initGameData() {
             renderShop();
             renderAvatar();
             scoreDisplay.textContent = gameState.score;
             streakDisplay.textContent = streak;
             nextQuestion();
+        }
+
+        // Initialize App (On load)
+        function initApp() {
+            populateCheatSheet();
             
-            // Focus input whenever window is clicked (helps with continuous play)
+            // Focus input whenever window is clicked, if a user is logged in
             document.addEventListener('click', (e) => {
-                if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                if(currentUser && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
                     userInput.focus();
                 }
             });
         }
 
-        // Start
-        init();
+        // Start App Framework
+        initApp();
     </script>
 </body>
 </html>
